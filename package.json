@@ -1,0 +1,23 @@
+{
+  "name": "redingo",
+  "version": "1.0.0",
+  "description": "",
+  "main": "redis.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lshthegod/Redingo.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/lshthegod/Redingo/issues"
+  },
+  "homepage": "https://github.com/lshthegod/Redingo#readme",
+  "dependencies": {
+    "mongodb": "^6.17.0",
+    "redis": "^5.6.0"
+  }
+}
