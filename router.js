@@ -11,7 +11,4 @@ router.post('/posts', controller.createPost);
 // 투표하기
 router.post('/posts/:id', controller.likePost);
 
-// 우승자 숨기기
-router.post('/hide', controller.hideWinner);
-
 module.exports = router;

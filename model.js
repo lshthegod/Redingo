@@ -4,6 +4,8 @@ const mongoose = require('mongoose');
 const ImageSchema = new mongoose.Schema({
   url: String,
   timestamp: { type: Date, default: Date.now }
+}, {
+  versionKey: false
 });
 const Image = mongoose.model('Image', ImageSchema);
 
@@ -12,6 +14,8 @@ const PostSchema = new mongoose.Schema({
   text: String,
   timestamp: { type: Date, default: Date.now },
   likes: { type: Number, default: 0 }
+}, {
+  versionKey: false
 });
 
 const Post = mongoose.model('Post', PostSchema);

@@ -1,21 +1,35 @@
 const { Image, Post } = require('./model'); // Image, Post 모델 import
-const moment = require('moment'); // 날짜 비교를 위해 moment 사용 (설치 필요: npm install moment)
+const moment = require('moment-timezone'); // 날짜 비교를 위해 moment 사용
 
 const Main = async (req, res) => {
   try {
-    // Image 모델에서 임의의 데이터 하나 가져오기
+    // 오늘 이미지 하나
     const image = await Image.findOne();
 
-    // 오늘 날짜의 00:00:00 ~ 23:59:59 범위 구하기
-    const startOfDay = moment().startOf('day').toDate();
-    const endOfDay = moment().endOf('day').toDate();
+    // 오늘 범위: 서울 기준
+    const startOfDay = moment().tz('Asia/Seoul').startOf('day').toDate();
+    const endOfDay = moment().tz('Asia/Seoul').endOf('day').toDate();
 
-    // Post 모델에서 timestamp가 오늘인 모든 글 가져오기
-    const posts = await Post.find({
+    // 오늘의 글들 (최신순 정렬)
+    let posts = await Post.find({
       timestamp: { $gte: startOfDay, $lte: endOfDay }
-    });
+    }).sort({ timestamp: -1 });
 
-    res.send({ image, posts });
+    // 좋아요 순 상위 3개
+    const postsTop3 = [...posts]
+      .sort((a, b) => b.likes - a.likes)
+      .slice(0, 3);
+
+    // 어제 범위
+    const startOfYesterday = moment().tz('Asia/Seoul').subtract(1, 'days').startOf('day').toDate();
+    const endOfYesterday = moment().tz('Asia/Seoul').subtract(1, 'days').endOf('day').toDate();
+
+    // 어제의 좋아요 가장 많은 글 1개
+    const yesterdayTopPost = await Post.findOne({
+      timestamp: { $gte: startOfYesterday, $lte: endOfYesterday }
+    }).sort({ likes: -1 });
+
+    res.send({ image, posts, postsTop3, yesterdayTopPost });
   } catch (err) {
     console.error('데이터 조회 실패:', err);
     res.status(500).send('서버 오류');
@@ -36,7 +50,6 @@ const createPost = async (req, res) => {
 };
 
 // 투표하기
-// redis 에 맞게 수정할 필요
 const likePost = async (req, res) => {
   const postId = req.params.id;
   try {
@@ -55,15 +68,8 @@ const likePost = async (req, res) => {
   }
 };
 
-// 우승자 숨기기
-const hideWinner = async (req, res) => {
-  // 실제 DB 업데이트 로직은 추후 구현
-  res.redirect('/');
-};
-
 module.exports = {
   Main,
   createPost,
-  likePost,
-  hideWinner
+  likePost
 };
