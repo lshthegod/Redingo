@@ -6,6 +6,11 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ========== Database ==========
+const { connectMongo } = require('./database/mongo');
+const { createRedisClient } = require('./database/redis');
+require('./database/scheduler');
+
 // ========== Middleware ==========
 app.use(morgan('dev'));
 app.use(express.json());
@@ -16,20 +21,27 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ========== Database ==========
-const db = require('./database');
-
-// MongoDB
-db.connectMongo();
-
-// Redis
-db.createRedisClient();
-
 // ========== Router ==========
 const router = require('./router');
 app.use(router);
 
 // ========== Server ==========
-app.listen(PORT, () => {
-  console.log(`서버 실행 중: http://localhost:${PORT}`);
-});
+async function startServer() {
+  try {
+    // MongoDB 연결
+    await connectMongo();
+
+    // Redis 연결
+    await createRedisClient();
+
+    // 서버 실행
+    app.listen(PORT, () => {
+      console.log(`서버 실행 중: http://localhost:${PORT}`);
+    });
+  } catch (err) {
+    console.error('서버 시작 실패:', err);
+    process.exit(1);
+  }
+}
+
+startServer();
