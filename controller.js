@@ -3,12 +3,20 @@ const moment = require('moment-timezone'); // 날짜 비교를 위해 moment 사
 
 const Main = async (req, res) => {
   try {
-    // 오늘 이미지 하나
-    const image = await Image.findOne();
-
-    // 오늘 범위: 서울 기준
+    // 오늘 날짜 범위: 서울 기준
     const startOfDay = moment().tz('Asia/Seoul').startOf('day').toDate();
     const endOfDay = moment().tz('Asia/Seoul').endOf('day').toDate();
+
+    // 오늘 날짜의 이미지를 먼저 찾음
+    let image = await Image.findOne({ timestamp: { $gte: startOfDay, $lte: endOfDay } });
+    // 없다면 timestamp가 없는 이미지를 찾아 오늘 날짜로 할당
+    if (!image) {
+      image = await Image.findOne({ timestamp: { $exists: false } });
+      if (image) {
+        image.timestamp = startOfDay;
+        await image.save();
+      }
+    }
 
     // 오늘의 글들 (최신순 정렬)
     let posts = await Post.find({
@@ -29,7 +37,23 @@ const Main = async (req, res) => {
       timestamp: { $gte: startOfYesterday, $lte: endOfYesterday }
     }).sort({ likes: -1 });
 
-    res.send({ image, posts, postsTop3, yesterdayTopPost });
+    // 어제의 우승 글의 timestamp와 일치하는 이미지 찾기
+    let yesterdayImage = null;
+    if (yesterdayTopPost) {
+      yesterdayImage = await Image.findOne({
+        timestamp: {
+          $gte: startOfYesterday,
+          $lte: endOfYesterday
+        }
+      });
+    }
+    res.render('main', {
+      image,
+      posts,
+      postsTop3,
+      yesterdayTopPost,
+      yesterdayImage
+    });
   } catch (err) {
     console.error('데이터 조회 실패:', err);
     res.status(500).send('서버 오류');

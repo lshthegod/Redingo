@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 // Image 스키마 및 모델
 const ImageSchema = new mongoose.Schema({
   url: String,
-  timestamp: { type: Date, default: Date.now }
+  timestamp: Date
 }, {
   versionKey: false
 });

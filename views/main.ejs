@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>뭘까요?</title>
+  <link rel="stylesheet" href="/main.css">
+</head>
+<body>
+  <!-- 어제의 글 (네모 박스 + 다시 보지 않기) -->
+  <div id="yesterdayBox" class="yesterday" style="display:none;">
+    <% if (yesterdayTopPost) { %>
+      <div class="post-box center-box">
+        <div style="font-weight:bold; font-size:1.2em; margin-bottom:5px;">어제의 우승</div>
+        <% if (yesterdayImage && yesterdayImage.url) { %>
+          <div style="margin:10px 0;">
+            <img src="<%= yesterdayImage.url %>" alt="어제의 이미지" style="max-width:300px; max-height:300px;">
+          </div>
+        <% } %>
+        <div>
+          <i style="font-size:1.3em;">"<%= yesterdayTopPost.text %>"</i>
+        </div>
+        <div><%= yesterdayTopPost.likes %>표 획득!</div>
+        <button id="hideYesterdayBtn" style="margin-top:10px;">다시 보지 않기</button>
+      </div>
+    <% } else { %>
+      <div class="post-box center-box">어제의 우승 글이 없습니다.</div>
+    <% } %>
+  </div>
+
+  <style>
+    .center-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+  </style>
+
+  <div class="center">
+    <!-- 안내문구 -->
+    <div class="guide-text">아래 사진을 보고 드는 생각을 자유롭게 작성해주세요.</div>
+    <!-- 오늘의 이미지 -->
+    <% if (image && image.url) { %>
+      <img src="<%= image.url %>" alt="오늘의 이미지">
+    <% } else { %>
+      <div>오늘의 이미지가 없습니다.</div>
+    <% } %>
+
+    <!-- Top3 제목 -->
+    <div class="top3-title">오늘의 Top3</div>
+    <!-- Top 3 Posts -->
+    <div class="top3-container">
+      <% postsTop3.forEach(function(post) { %>
+        <div class="post-box" data-id="<%= post._id %>">
+          <span><%= post.text %></span>
+          <form class="like-form" method="post" action="/posts/<%= post._id %>" style="margin:0;">
+            <button type="submit" class="like-btn">👍 <span><%= post.likes %></span></button>
+          </form>
+        </div>
+      <% }) %>
+    </div>
+
+    <!-- 새 글 작성 -->
+    <form class="new-post-form" id="newPostForm" method="post" action="/posts">
+      <input type="text" name="text" id="newPostInput" placeholder="새 글을 입력하세요" required>
+      <button type="submit">전송</button>
+    </form>
+
+    <!-- Posts -->
+    <div class="posts-container" id="postsContainer">
+      <% posts.forEach(function(post) { %>
+        <div class="post-box" data-id="<%= post._id %>">
+          <span><%= post.text %></span>
+          <form class="like-form" method="post" action="/posts/<%= post._id %>" style="margin:0;">
+            <button type="submit" class="like-btn">👍 <span><%= post.likes %></span></button>
+          </form>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+
+  <script>
+    // 어제의 우승 글 다시 보지 않기 기능
+    function getTodayStr() {
+      const d = new Date();
+      return d.getFullYear() + '-' + (d.getMonth()+1).toString().padStart(2,'0') + '-' + d.getDate().toString().padStart(2,'0');
+    }
+    (function() {
+      const box = document.getElementById('yesterdayBox');
+      const today = getTodayStr();
+      if (localStorage.getItem('hideYesterday') === today) {
+        box.style.display = 'none';
+      } else {
+        box.style.display = '';
+      }
+      const btn = document.getElementById('hideYesterdayBtn');
+      if (btn) {
+        btn.onclick = function() {
+          localStorage.setItem('hideYesterday', today);
+          box.style.display = 'none';
+        };
+      }
+    })();
+
+    // 새 글 작성 AJAX
+    document.getElementById('newPostForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const input = document.getElementById('newPostInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const res = await fetch('/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
+      if (res.ok) {
+        const post = await res.json();
+        // 새 글을 postsContainer 맨 위에 추가
+        const container = document.getElementById('postsContainer');
+        const div = document.createElement('div');
+        div.className = 'post-box';
+        div.setAttribute('data-id', post._id);
+        div.innerHTML = `
+          <span>${post.text}</span>
+          <form class="like-form" method="post" action="/posts/${post._id}" style="margin:0;">
+            <button type="submit" class="like-btn">👍 <span>${post.likes}</span></button>
+          </form>
+        `;
+        container.prepend(div);
+        input.value = '';
+      } else {
+        alert('글 작성 실패');
+      }
+    });
+
+    // Like 버튼 AJAX (Top3, posts 모두 동기화)
+    document.addEventListener('submit', async function(e) {
+      if (e.target.classList.contains('like-form')) {
+        e.preventDefault();
+        const form = e.target;
+        const postId = form.action.split('/').pop();
+        const res = await fetch(`/posts/${postId}`, { method: 'POST' });
+        if (res.ok) {
+          const data = await res.json();
+          // 같은 postId를 가진 모든 like 숫자 갱신 (top3, posts 모두)
+          document.querySelectorAll(`.post-box[data-id='${postId}'] .like-btn span`).forEach(function(span) {
+            span.textContent = data.likes;
+          });
+        } else {
+          alert('좋아요 실패');
+        }
+      }
+    });
+  </script>
+</body>
+</html>

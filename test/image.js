@@ -11,7 +11,7 @@ async function main() {
     await client.connect();
     console.log('MongoDB 연결 성공');
 
-    const db = client.db('testdb');
+    const db = client.db('redingo');
     const collection = db.collection('images');
 
     const readline = require('readline');
