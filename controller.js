@@ -9,10 +9,9 @@ const Main = async (req, res) => {
     const startOfDay = moment().tz('Asia/Seoul').startOf('day').toDate();
     const endOfDay = moment().tz('Asia/Seoul').endOf('day').toDate();
 
-    // Redis에서 오늘의 Top3, posts, image, 어제의 우승글/이미지 캐시 조회
-    let [postsCache, postsTop3Cache, imageCache, yesterdayTopPostCache, yesterdayImageCache] = await Promise.all([
+    // Redis에서 오늘의 posts, image, 어제의 우승글/이미지 캐시 조회
+    let [postsCache, imageCache, yesterdayTopPostCache, yesterdayImageCache] = await Promise.all([
       redis ? redis.get('posts:today') : null,
-      redis ? redis.get('postsTop3:today') : null,
       redis ? redis.get('image:today') : null,
       redis ? redis.get('yesterdayTopPost') : null,
       redis ? redis.get('yesterdayImage') : null
@@ -30,13 +29,8 @@ const Main = async (req, res) => {
       if (redis) await redis.set('posts:today', JSON.stringify(posts), { EX: 300 });
     }
 
-    // 좋아요 순 상위 3개
-    if (postsTop3Cache) {
-      postsTop3 = JSON.parse(postsTop3Cache);
-    } else {
-      postsTop3 = [...posts].sort((a, b) => b.likes - a.likes).slice(0, 3);
-      if (redis) await redis.set('postsTop3:today', JSON.stringify(postsTop3), { EX: 300 });
-    }
+    // 좋아요 순 상위 3개 (posts:today에서 추출)
+    postsTop3 = [...posts].sort((a, b) => b.likes - a.likes).slice(0, 3);
 
     // 오늘 날짜의 이미지를 먼저 찾음
     if (imageCache) {
@@ -64,7 +58,7 @@ const Main = async (req, res) => {
       yesterdayTopPost = await Post.findOne({
         timestamp: { $gte: startOfYesterday, $lte: endOfYesterday }
       }).sort({ likes: -1 });
-      if (redis && yesterdayTopPost) await redis.set('yesterdayTopPost', JSON.stringify(yesterdayTopPost), { EX: 300 });
+      if (redis && yesterdayTopPost) await redis.set('yesterdayTopPost', JSON.stringify(yesterdayTopPost), { EX: 86400 });
     }
 
     // 어제의 우승 글의 timestamp와 일치하는 이미지 찾기
@@ -78,26 +72,8 @@ const Main = async (req, res) => {
             $lte: endOfYesterday
           }
         });
-        if (redis && yesterdayImage) await redis.set('yesterdayImage', JSON.stringify(yesterdayImage), { EX: 300 });
+        if (redis && yesterdayImage) await redis.set('yesterdayImage', JSON.stringify(yesterdayImage), { EX: 86400 });
       }
-    }
-
-    // 좋아요 수 Redis에서 동기화
-    if (redis && posts) {
-      for (const post of posts) {
-        const redisLikes = await redis.get(`post:likes:${post._id}`);
-        if (redisLikes !== null) post.likes = parseInt(redisLikes, 10);
-      }
-    }
-    if (redis && postsTop3) {
-      for (const post of postsTop3) {
-        const redisLikes = await redis.get(`post:likes:${post._id}`);
-        if (redisLikes !== null) post.likes = parseInt(redisLikes, 10);
-      }
-    }
-    if (redis && yesterdayTopPost) {
-      const redisLikes = await redis.get(`post:likes:${yesterdayTopPost._id}`);
-      if (redisLikes !== null) yesterdayTopPost.likes = parseInt(redisLikes, 10);
     }
 
     res.render('main', {
@@ -116,9 +92,17 @@ const Main = async (req, res) => {
 // 게시글 생성
 const createPost = async (req, res) => {
   const { text } = req.body; // body에서 text 추출
+  const redis = getRedisClient();
   try {
     const newPost = new Post({ text }); // text 필드로 Post 생성
     await newPost.save();
+    // posts:today Redis 캐시 갱신 (맨 앞에 추가)
+    if (redis) {
+      const postsCache = await redis.get('posts:today');
+      let posts = postsCache ? JSON.parse(postsCache) : [];
+      posts.unshift(newPost); // 최신 글을 맨 앞에 추가
+      await redis.set('posts:today', JSON.stringify(posts), { EX: 300 });
+    }
     res.status(201).json(newPost);
   } catch (err) {
     console.error('게시글 생성 실패:', err);
@@ -131,12 +115,26 @@ const likePost = async (req, res) => {
   const postId = req.params.id;
   const redis = getRedisClient();
   try {
-    // Redis에 좋아요 수 증가
     let likes = 0;
     if (redis) {
-      likes = await redis.incr(`post:likes:${postId}`);
+      // posts:today 캐시에서 해당 post의 likes를 1 증가
+      const postsCache = await redis.get('posts:today');
+      let posts = postsCache ? JSON.parse(postsCache) : [];
+      let updated = false;
+      posts = posts.map(post => {
+        if (post._id === postId) {
+          post.likes = (post.likes || 0) + 1;
+          likes = post.likes;
+          updated = true;
+        }
+        return post;
+      });
+      if (updated) {
+        await redis.set('posts:today', JSON.stringify(posts), { EX: 300 });
+      }
     }
     // 클라이언트에 즉시 응답
+    console.log(`${postId} 좋아요 수: ${likes}`);
     res.status(200).json({ likes });
     // MongoDB likes 동기화는 별도 백그라운드에서 처리(여기서는 하지 않음)
   } catch (err) {
