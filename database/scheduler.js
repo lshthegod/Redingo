@@ -1,5 +1,5 @@
 const cron = require('node-cron');
-const { Post } = require('../model');
+const { Post } = require('../models/index');
 const { getRedisClient } = require('./redis');
 
 // 매분마다 Redis likes → MongoDB 동기화

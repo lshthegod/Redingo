@@ -22,7 +22,7 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ========== Router ==========
-const router = require('./router');
+const router = require('./routes/index');
 app.use(router);
 
 // ========== Server ==========
