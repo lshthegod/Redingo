@@ -39,7 +39,7 @@ async function getTodayImage() {
     }
   }
 
-  if (redis && image) await redis.set('image:today', JSON.stringify(image), { EX: 300 });
+  if (redis && image) await redis.set('image:today', JSON.stringify(image), { EX: 86400 });
   return image;
 }
 
