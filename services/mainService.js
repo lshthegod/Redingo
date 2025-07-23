@@ -1,4 +1,4 @@
-const { Post, Image } = require('../model');
+const { Post, Image } = require('../models/index');
 const moment = require('moment-timezone');
 const { getRedisClient } = require('../database/redis');
 

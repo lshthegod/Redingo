@@ -1,4 +1,4 @@
-const { Post } = require('../model');
+const { Post } = require('../models/index');
 const { getRedisClient } = require('../database/redis');
 
 // 🔹 새 게시글 저장
